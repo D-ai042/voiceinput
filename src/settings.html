@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>VoiceInput 设置</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 24px 28px;
+            user-select: none;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            margin-bottom: 18px;
+        }
+
+        .section label {
+            display: block;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .section select,
+        .section input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+            transition: border 0.2s, background 0.2s;
+        }
+
+        .section select:focus,
+        .section input:focus {
+            border-color: rgba(100, 180, 255, 0.5);
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .section select option {
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
+
+        .section input::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        .section .hint {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.3);
+            margin-top: 4px;
+        }
+
+        .divider {
+            border: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            margin: 18px 0;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 22px;
+            justify-content: flex-end;
+        }
+
+        .btn-row button {
+            padding: 9px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        #save-btn {
+            background: #4CAF50;
+            color: #fff;
+        }
+
+        #save-btn:hover {
+            background: #43A047;
+        }
+
+        #cancel-btn {
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        #cancel-btn:hover {
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        #status-msg {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.4);
+            text-align: right;
+            margin-top: 10px;
+            min-height: 18px;
+        }
+
+        #status-msg.success {
+            color: #81C784;
+        }
+
+        #status-msg.error {
+            color: #E57373;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>⚙️ VoiceInput 设置</h2>
+
+    <div class="section">
+        <label for="provider-select">识别模式</label>
+        <select id="provider-select">
+            <option value="baidu_stream">百度语音 - 流式模式 (边录边识) ✅</option>
+            <option value="baidu_normal">百度语音 - 标准模式 (录音→识别)</option>
+        </select>
+        <div class="hint">推荐使用流式模式，识别速度更快</div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="section">
+        <label for="settings-app-id">百度 App ID</label>
+        <input type="text" id="settings-app-id" placeholder="例如：12345678">
+    </div>
+
+    <div class="section">
+        <label for="settings-api-key">百度 API Key</label>
+        <input type="text" id="settings-api-key" placeholder="例如：UA4oPSxxxxkGOuFbb6">
+        <div class="hint">请到百度智能云控制台 → 语音技术 → 创建应用获取</div>
+    </div>
+
+    <div class="section">
+        <label for="settings-secret-key">百度 Secret Key</label>
+        <input type="text" id="settings-secret-key" placeholder="例如：tPqgBQbwVwxxxxx2fGkHdV2c">
+    </div>
+
+    <div class="btn-row">
+        <button id="cancel-btn">取消</button>
+        <button id="save-btn">保存设置</button>
+    </div>
+
+    <div id="status-msg"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const providerSelect = document.getElementById('provider-select');
+            const appIdInput = document.getElementById('settings-app-id');
+            const apiKeyInput = document.getElementById('settings-api-key');
+            const secretKeyInput = document.getElementById('settings-secret-key');
+            const saveBtn = document.getElementById('save-btn');
+            const cancelBtn = document.getElementById('cancel-btn');
+            const statusMsg = document.getElementById('status-msg');
+
+            // 加载当前配置
+            window.settingsAPI.loadSettings().then((settings) => {
+                providerSelect.value = settings.PROVIDER || 'baidu_stream';
+                appIdInput.value = settings.BAIDU_APP_ID || '';
+                apiKeyInput.value = settings.BAIDU_API_KEY || '';
+                secretKeyInput.value = settings.BAIDU_SECRET_KEY || '';
+            });
+
+            saveBtn.addEventListener('click', () => {
+                const settings = {
+                    PROVIDER: providerSelect.value,
+                    BAIDU_APP_ID: appIdInput.value.trim(),
+                    BAIDU_API_KEY: apiKeyInput.value.trim(),
+                    BAIDU_SECRET_KEY: secretKeyInput.value.trim()
+                };
+
+                window.settingsAPI.saveSettings(settings).then((result) => {
+                    if (result.success) {
+                        statusMsg.textContent = '✅ 设置已保存';
+                        statusMsg.className = 'success';
+                        setTimeout(() => window.close(), 800);
+                    } else {
+                        statusMsg.textContent = '❌ 保存失败: ' + (result.error || '未知错误');
+                        statusMsg.className = 'error';
+                    }
+                });
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                window.close();
+            });
+
+            // Enter 键保存
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') saveBtn.click();
+                if (e.key === 'Escape') cancelBtn.click();
+            });
+        });
+    </script>
+</body>
+
+</html>
