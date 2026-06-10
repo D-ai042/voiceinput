@@ -11,6 +11,7 @@ let errorCallback = null;
 let resultCallback = null;
 let isActive = false;
 let sn = '';
+let audioBuffer = []; // WebSocket 未就绪时缓存音频
 
 /**
  * 生成唯一 sn
@@ -72,6 +73,9 @@ function start(onResult, onError, onFinish) {
                 }
             };
             wsClient.send(JSON.stringify(startFrame));
+
+            // 发送 START 后立即刷新缓冲的音频数据
+            flushAudioBuffer();
         });
 
         wsClient.on('message', (data) => {
@@ -134,11 +138,30 @@ function start(onResult, onError, onFinish) {
 }
 
 /**
+ * 刷新音频缓冲 — 将等待中的音频数据发送到 WebSocket
+ */
+function flushAudioBuffer() {
+    while (audioBuffer.length > 0) {
+        const buf = audioBuffer.shift();
+        try {
+            if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+                wsClient.send(buf);
+            }
+        } catch (e) { /* 忽略 */ }
+    }
+}
+
+/**
  * 发送音频数据 (PCM 16bit 16kHz 单声道)
+ * 如果 WebSocket 未就绪，自动缓冲，连接后自动发送
  * @param {Buffer} pcmBuffer - PCM 音频数据块
  */
 function sendAudio(pcmBuffer) {
-    if (!wsClient || !isActive || wsClient.readyState !== WebSocket.OPEN) {
+    if (!wsClient || !isActive) return;
+
+    // WebSocket 未就绪 → 缓冲
+    if (wsClient.readyState !== WebSocket.OPEN) {
+        audioBuffer.push(pcmBuffer);
         return;
     }
 
@@ -157,6 +180,7 @@ function stop() {
         cleanup();
         return;
     }
+    isActive = false; // 立即标记为非活跃，允许新识别快速启动
 
     try {
         // 发送 FINISH 帧
@@ -175,7 +199,6 @@ function stop() {
         } catch (e) {
             // 忽略
         }
-        isActive = false;
         cleanup();
     }, 2000);
 }
@@ -199,6 +222,7 @@ function cancel() {
 
 function cleanup() {
     wsClient = null;
+    audioBuffer = [];
     // 不清理回调，防止先调用后赋值
 }
 

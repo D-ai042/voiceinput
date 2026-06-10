@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const baiduStt = require('./baidu_stt');
 const baiduStream = require('./baidu_stream');
+const customStt = require('./custom_stt');
 const autoType = require('./auto_type');
 
 let mainWindow = null;
@@ -13,9 +14,6 @@ let isRecording = false;
 let isProcessing = false;
 let isPasting = false;
 let currentProvider = 'baidu_stream';
-let streamResultText = '';
-let accumulatedText = '';
-let pastedLength = 0; // 已流式粘贴的字符长度，避免重复
 
 const ICONS = {
   normal: '🎤',
@@ -29,6 +27,22 @@ function getConfig() {
   const configPath = path.join(__dirname, 'config.js');
   delete require.cache[require.resolve(configPath)];
   return require('./config');
+}
+
+/**
+ * 更新图标（带状态文字同步）
+ */
+function updateIcon(status) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('update-icon', ICONS[status] || ICONS.normal);
+  const statusTexts = {
+    recording: '🎤 录音中…',
+    processing: '⏳ 识别中…',
+    success: '✅',
+    error: '❌ 识别失败',
+    normal: '就绪'
+  };
+  mainWindow.webContents.send('update-status', statusTexts[status] || '就绪');
 }
 
 /**
@@ -60,17 +74,23 @@ function writeUserSettings(settings) {
 
   // 更新当前 provider
   currentProvider = settings.PROVIDER || 'baidu_stream';
+
+  // 如果切换到自定义 WebSocket 模式且正在录制，停止旧的流
+  if (currentProvider !== 'custom' && customStt.isWsStreaming()) {
+    customStt.stopWebSocket();
+  }
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 120,
-    height: 200,
+    width: 60,
+    height: 80,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
     resizable: false,
-    skipTaskbar: false,
+    skipTaskbar: true,
+    focusable: false,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -88,6 +108,7 @@ function createWindow() {
   mainWindow.setPosition(width - 150, height - 230);
 
   mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
     // 窗口默认隐藏，后台运行
     // 用户通过 Ctrl+Shift+V 录音，文字直接到当前焦点输入框
     updateIcon('normal');
@@ -184,7 +205,7 @@ function showSettingsWindow() {
   settingsWindow = new BrowserWindow({
     width: 480,
     height: 420,
-    resizable: false,
+    resizable: true,
     alwaysOnTop: true,
     frame: true,
     title: 'VoiceInput 设置',
@@ -217,30 +238,44 @@ function showSettingsWindow() {
 }
 
 async function startRecording() {
-  if (isRecording || isProcessing || baiduStream.isStreaming()) return;
+  if (isRecording || isProcessing || baiduStream.isStreaming() || customStt.isWsStreaming()) return;
 
   const config = getConfig();
 
-  if (!config.BAIDU_APP_ID || !config.BAIDU_API_KEY) {
-    // 不弹窗，只通过托盘提示
-    if (tray) tray.setToolTip('⚠️ VoiceInput - 请先配置 API Key');
-    showSettingsWindow();
-    return;
+  // ===== 检查对应 provider 的配置 =====
+  if (currentProvider === 'baidu_normal' || currentProvider === 'baidu_stream') {
+    if (!config.BAIDU_APP_ID || !config.BAIDU_API_KEY) {
+      if (tray) tray.setToolTip('⚠️ VoiceInput - 请先配置百度 API Key');
+      updateIcon('error');
+      updateStatus('⚠️ 未配置密钥');
+      setTimeout(() => finishRecording(), 2000);
+      return;
+    }
+  } else if (currentProvider === 'custom') {
+    if (!config.CUSTOM_ENDPOINT || !config.CUSTOM_API_KEY) {
+      if (tray) tray.setToolTip('⚠️ VoiceInput - 请先配置自定义 API');
+      updateIcon('error');
+      updateStatus('⚠️ 未配置自定义 API');
+      setTimeout(() => finishRecording(), 2000);
+      return;
+    }
   }
 
-  // ===== 确保窗口隐藏，不打扰用户 =====
-  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) {
-    mainWindow.hide();
-  }
+  // ===== 判断是流式还是非流式 =====
+  const isCustomWs = currentProvider === 'custom' && customStt.isWsMode();
 
-  if (currentProvider === 'baidu_normal') {
-    // ===== 标准模式 =====
+  if (currentProvider === 'baidu_normal' || (currentProvider === 'custom' && !isCustomWs)) {
+    // ===== 非流式（标准）模式 =====
     isRecording = true;
     if (tray) tray.setToolTip('🔴 VoiceInput - 录音中 (双击停止)');
     updateTrayMenu(true);
+    mainWindow.webContents.send('start-recording-ui');
     mainWindow.webContents.send('start-recording');
+  } else if (isCustomWs) {
+    // ===== 自定义 WebSocket 流式 =====
+    startCustomStreamRecording();
   } else {
-    // ===== 流式模式 =====
+    // ===== 百度流式模式 =====
     startStreamRecording();
   }
 }
@@ -248,14 +283,32 @@ async function startRecording() {
 async function stopRecording() {
   if (!isRecording) return;
 
-  if (currentProvider === 'baidu_normal') {
-    isRecording = false;
-    isProcessing = true;
+  isRecording = false;
+  isProcessing = true;
+
+  const isCustomWs = currentProvider === 'custom' && customStt.isWsMode();
+
+  if (currentProvider === 'baidu_normal' || (currentProvider === 'custom' && !isCustomWs)) {
+    // ===== 非流式（标准）模式 =====
+    updateIcon('processing');
     if (tray) tray.setToolTip('⏳ VoiceInput - 识别中...');
     updateTrayMenu(false);
+    mainWindow.webContents.send('stop-recording-ui');
     mainWindow.webContents.send('stop-recording');
+  } else if (isCustomWs) {
+    // ===== 自定义 WebSocket 流式 =====
+    updateIcon('processing');
+    mainWindow.webContents.send('stop-recording-ui');
+    mainWindow.webContents.send('stop-stream-recording');
+    customStt.stopWebSocket();
+    // 由 onFinish 回调触发 finishRecording
   } else {
-    stopStreamRecording();
+    // ===== 百度流式模式 =====
+    updateIcon('processing');
+    mainWindow.webContents.send('stop-recording-ui');
+    mainWindow.webContents.send('stop-stream-recording');
+    baiduStream.stop();
+    // 由 onFinish 回调触发 finishRecording
   }
 }
 
@@ -264,53 +317,45 @@ async function stopRecording() {
  */
 function startStreamRecording() {
   isRecording = true;
-  streamResultText = '';
-  accumulatedText = '';
-  pastedLength = 0;
 
   updateIcon('recording');
+  mainWindow.webContents.send('start-recording-ui');
   updateTrayMenu(true);
   if (tray) tray.setToolTip('🔴 VoiceInput - 录音中 (Ctrl+Shift+V 停止)');
 
   // 启动百度流式识别
   const started = baiduStream.start(
-    // onResult — 收到识别结果，直接粘贴，不经过窗口
+    // onResult — 收到识别结果，实时显示在弹窗
     (text, isFinal) => {
-      streamResultText = text;
+      // 实时显示百度返回的文字到弹窗状态栏
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('stream-interim', text);
+      }
       if (isFinal && text.trim()) {
-        accumulatedText += text;
-        // 更新托盘显示最近文字
-        if (tray) {
-          const short = text.length > 15 ? text.substring(0, 15) + '…' : text;
-          tray.setToolTip('🔴 ' + short);
-        }
-        // == 关键：直接粘贴到当前焦点输入框，零延迟 ==
-        doPasteImmediate(text);
+        // 每句最终结果直接剪贴板粘贴（完美支持中文）
+        autoType.typeText(text);
       }
     },
     // onError
     (errMsg) => {
       updateIcon('error');
-      isRecording = false;
       isProcessing = false;
       if (tray) tray.setToolTip('❌ VoiceInput - ' + errMsg);
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('stop-stream-recording');
       }
-      setTimeout(() => finishRecording(), 2000);
+      finishRecording();
     },
     // onFinish
     (finalText) => {
-      const remaining = accumulatedText.substring(pastedLength);
-      if (remaining) {
-        doPasteImmediate(remaining);
-      }
-      finishRecording();
+      // 确保 processing 状态至少显示 500ms 才切为 success
+      setTimeout(() => finishRecording(), 500);
     }
   );
 
   if (!started) {
     isRecording = false;
+    isProcessing = false;
     return;
   }
 
@@ -318,50 +363,86 @@ function startStreamRecording() {
 }
 
 /**
- * 流式录音停止
+ * 自定义 WebSocket 流式录音开始
  */
-function stopStreamRecording() {
-  isRecording = false;
-  isProcessing = true;
-  mainWindow.webContents.send('stop-stream-recording');
-  if (tray) tray.setToolTip('⏳ VoiceInput - 识别中...');
-  baiduStream.stop();
+function startCustomStreamRecording() {
+  isRecording = true;
+
+  updateIcon('recording');
+  mainWindow.webContents.send('start-recording-ui');
+  updateTrayMenu(true);
+  if (tray) tray.setToolTip('🔴 VoiceInput - 录音中 (Ctrl+Shift+V 停止)');
+
+  // 启动自定义 WebSocket 流式识别
+  const started = customStt.startWebSocket(
+    // onResult
+    (text, isFinal) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('stream-interim', text);
+      }
+      if (isFinal && text.trim()) {
+        autoType.typeText(text);
+      }
+    },
+    // onError
+    (errMsg) => {
+      updateIcon('error');
+      isProcessing = false;
+      if (tray) tray.setToolTip('❌ VoiceInput - ' + errMsg);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('stop-stream-recording');
+      }
+      finishRecording();
+    },
+    // onFinish
+    (finalText) => {
+      setTimeout(() => finishRecording(), 500);
+    }
+  );
+
+  if (!started) {
+    isRecording = false;
+    isProcessing = false;
+    return;
+  }
+
+  mainWindow.webContents.send('start-stream-recording');
 }
 
 /**
  * 即时粘贴 — 文字直接发到当前焦点输入框
- * 不做任何 UI 更新，不碰窗口，纯后台操作
  */
 function doPasteImmediate(text) {
-  if (isPasting) return;
+  if (isPasting || !text) return;
   isPasting = true;
-  pastedLength += text.length;
 
   try {
-    autoType.typeText(text);
+    autoType.typeText(text, () => {
+      setTimeout(() => { isPasting = false; }, 30);
+    });
   } catch (error) {
     console.error('Paste failed:', error);
+    setTimeout(() => { isPasting = false; }, 30);
   }
-
-  // 立即释放锁（Excel、记事本等处理粘贴需要一点时间）
-  setTimeout(() => {
-    isPasting = false;
-  }, 50);
 }
 
 /**
- * 录音结束清理
+ * 录音结束清理 — 打勾 → 恢复就绪
  */
 function finishRecording() {
   isRecording = false;
   isProcessing = false;
   isPasting = false;
-  updateIcon('normal');
   if (tray) tray.setToolTip('VoiceInput - 就绪 (Ctrl+Shift+V 录音)');
   updateTrayMenu(false);
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('reset-ui');
-  }
+  // 先显示 ✅ 打勾动画，800ms 后恢复 normal
+  updateIcon('success');
+  setTimeout(() => {
+    updateIcon('normal');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('reset-ui');
+    }
+  }, 800);
 }
 
 /**
@@ -376,16 +457,24 @@ async function processRecognition(audioPath) {
     return;
   }
 
-  isProcessing = true;
+  // 识别中状态（已在 stopRecording 中设置）
   if (tray) tray.setToolTip('⏳ VoiceInput - 识别中...');
 
   try {
-    const text = await baiduStt.recognizeSpeech(audioPath);
+    let text;
+    if (currentProvider === 'custom') {
+      // 使用自定义模块识别
+      text = await customStt.recognizeSpeech(audioPath);
+    } else {
+      // 使用百度识别
+      text = await baiduStt.recognizeSpeech(audioPath);
+    }
     cleanupTempFile(audioPath);
     doPasteImmediate(text);
-    setTimeout(() => finishRecording(), 800);
+    finishRecording();
   } catch (error) {
     cleanupTempFile(audioPath);
+    updateIcon('error');
     if (tray) tray.setToolTip('❌ VoiceInput - ' + error.message);
     setTimeout(() => finishRecording(), 2000);
   }
@@ -418,6 +507,20 @@ ipcMain.on('toggle-recording', () => {
   toggleRecording();
 });
 
+// 按下按钮：立即启动录音
+ipcMain.on('start-recording-press', () => {
+  if (isRecording || isProcessing || baiduStream.isStreaming() || customStt.isWsStreaming()) return;
+  mainWindow.webContents.send('start-recording-ui');
+  startRecording();
+});
+
+// 松开按钮：停止录音
+ipcMain.on('stop-recording-press', () => {
+  if (isRecording) {
+    stopRecording();
+  }
+});
+
 ipcMain.on('recording-complete', (event, audioPath) => {
   processRecognition(audioPath);
 });
@@ -429,6 +532,9 @@ ipcMain.on('open-settings', () => {
 ipcMain.on('quit-app', () => {
   if (baiduStream.isStreaming()) {
     baiduStream.cancel();
+  }
+  if (customStt.isWsStreaming()) {
+    customStt.stopWebSocket();
   }
   app.quit();
 });
@@ -445,26 +551,6 @@ ipcMain.on('force-show', () => {
     mainWindow.show();
     mainWindow.focus();
   }
-});
-
-ipcMain.on('open-settings', () => {
-  showSettingsWindow();
-});
-
-ipcMain.on('quit-app', () => {
-  if (baiduStream.isStreaming()) {
-    baiduStream.cancel();
-  }
-  app.quit();
-});
-
-ipcMain.on('window-drag', (event, { dx, dy }) => {
-  const [x, y] = mainWindow.getPosition();
-  mainWindow.setPosition(x + dx, y + dy);
-});
-
-ipcMain.on('force-show', () => {
-  forceWindowVisible();
 });
 
 // 保存音频文件（非流式）
@@ -496,7 +582,11 @@ ipcMain.handle('set-mode', (event, mode) => {
 
 // 渲染进程发送 PCM 音频块（流式）
 ipcMain.on('stream-audio-chunk', (event, pcmBuffer) => {
-  if (baiduStream.isStreaming()) {
+  const isCustomWs = currentProvider === 'custom' && customStt.isWsMode();
+
+  if (isCustomWs) {
+    customStt.sendWsAudio(Buffer.from(pcmBuffer));
+  } else {
     baiduStream.sendAudio(Buffer.from(pcmBuffer));
   }
 });
@@ -515,9 +605,19 @@ ipcMain.handle('load-settings', () => {
   const settings = readUserSettings();
   return {
     PROVIDER: settings.PROVIDER || 'baidu_stream',
+    // 百度
     BAIDU_APP_ID: settings.BAIDU_APP_ID || '',
     BAIDU_API_KEY: settings.BAIDU_API_KEY || '',
-    BAIDU_SECRET_KEY: settings.BAIDU_SECRET_KEY || ''
+    BAIDU_SECRET_KEY: settings.BAIDU_SECRET_KEY || '',
+    // 自定义模块
+    CUSTOM_ENDPOINT: settings.CUSTOM_ENDPOINT || '',
+    CUSTOM_API_KEY: settings.CUSTOM_API_KEY || '',
+    CUSTOM_MODEL: settings.CUSTOM_MODEL || 'whisper-1',
+    CUSTOM_AUTH_TYPE: settings.CUSTOM_AUTH_TYPE || 'bearer',
+    CUSTOM_METHOD: settings.CUSTOM_METHOD || 'POST',
+    CUSTOM_HEADERS: settings.CUSTOM_HEADERS || '{}',
+    CUSTOM_BODY_TEMPLATE: settings.CUSTOM_BODY_TEMPLATE || '{"audio": "{{AUDIO_BASE64}}"}',
+    CUSTOM_WS_PROTOCOL: settings.CUSTOM_WS_PROTOCOL || ''
   };
 });
 
@@ -527,10 +627,21 @@ ipcMain.handle('save-settings', async (event, settings) => {
     const existing = readUserSettings();
     const newSettings = {
       ...existing,
+      // Provider
       PROVIDER: settings.PROVIDER || existing.PROVIDER || 'baidu_stream',
+      // 百度
       BAIDU_APP_ID: settings.BAIDU_APP_ID || existing.BAIDU_APP_ID || '',
       BAIDU_API_KEY: settings.BAIDU_API_KEY || existing.BAIDU_API_KEY || '',
-      BAIDU_SECRET_KEY: settings.BAIDU_SECRET_KEY || existing.BAIDU_SECRET_KEY || ''
+      BAIDU_SECRET_KEY: settings.BAIDU_SECRET_KEY || existing.BAIDU_SECRET_KEY || '',
+      // 自定义模块
+      CUSTOM_ENDPOINT: settings.CUSTOM_ENDPOINT || existing.CUSTOM_ENDPOINT || '',
+      CUSTOM_API_KEY: settings.CUSTOM_API_KEY || existing.CUSTOM_API_KEY || '',
+      CUSTOM_MODEL: settings.CUSTOM_MODEL || existing.CUSTOM_MODEL || 'whisper-1',
+      CUSTOM_AUTH_TYPE: settings.CUSTOM_AUTH_TYPE || existing.CUSTOM_AUTH_TYPE || 'bearer',
+      CUSTOM_METHOD: settings.CUSTOM_METHOD || existing.CUSTOM_METHOD || 'POST',
+      CUSTOM_HEADERS: settings.CUSTOM_HEADERS || existing.CUSTOM_HEADERS || '{}',
+      CUSTOM_BODY_TEMPLATE: settings.CUSTOM_BODY_TEMPLATE || existing.CUSTOM_BODY_TEMPLATE || '{"audio": "{{AUDIO_BASE64}}"}',
+      CUSTOM_WS_PROTOCOL: settings.CUSTOM_WS_PROTOCOL || existing.CUSTOM_WS_PROTOCOL || ''
     };
     writeUserSettings(newSettings);
 
@@ -593,7 +704,7 @@ app.on('before-quit', () => {
 
 function toggleRecording() {
   if (isPasting) return;
-  if (isRecording) {
+  if (isRecording || baiduStream.isStreaming() || customStt.isWsStreaming()) {
     stopRecording();
   } else {
     startRecording();

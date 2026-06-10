@@ -11,7 +11,7 @@
   "build": {
     "win": {
       "target": "portable",
-      "icon": "src/assets/icon.ico"
+      "icon": "src/assets/app3.ico"
     },
     "portable": {
       "artifactName": "VoiceInput.exe"
@@ -19,10 +19,14 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
+    "form-data": "^4.0.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
     "electron": "^42.3.3",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "icojs": "^1.0.0",
+    "png-to-ico": "^3.0.1",
+    "rcedit": "^5.0.2"
   }
 }

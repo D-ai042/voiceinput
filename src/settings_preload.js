@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('settingsAPI', {
 
     /**
      * 保存设置
-     * @param {object} settings - { PROVIDER, BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY }
+     * @param {object} settings - 包含所有模块的配置项
      */
     saveSettings: (settings) => {
         return ipcRenderer.invoke('save-settings', settings);

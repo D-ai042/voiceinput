@@ -66,14 +66,42 @@
             color: #e0e0e0;
         }
 
-        .section input::placeholder {
+        .section input::placeholder,
+        .section textarea::placeholder {
             color: rgba(255, 255, 255, 0.25);
+        }
+
+        .section textarea {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.06);
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+            transition: border 0.2s, background 0.2s;
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            resize: vertical;
+        }
+
+        .section textarea:focus {
+            border-color: rgba(100, 180, 255, 0.5);
+            background: rgba(255, 255, 255, 0.09);
         }
 
         .section .hint {
             font-size: 11px;
             color: rgba(255, 255, 255, 0.3);
             margin-top: 4px;
+        }
+
+        .section .hint code {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 11px;
+            color: rgba(100, 200, 255, 0.7);
         }
 
         .divider {
@@ -139,30 +167,97 @@
     <h2>⚙️ VoiceInput 设置</h2>
 
     <div class="section">
-        <label for="provider-select">识别模式</label>
+        <label for="provider-select">识别服务</label>
         <select id="provider-select">
             <option value="baidu_stream">百度语音 - 流式模式 (边录边识) ✅</option>
             <option value="baidu_normal">百度语音 - 标准模式 (录音→识别)</option>
+            <option value="custom">🌟 自定义模块</option>
         </select>
-        <div class="hint">推荐使用流式模式，识别速度更快</div>
+        <div class="hint" id="provider-hint">推荐使用流式模式，识别速度更快</div>
     </div>
 
     <hr class="divider">
 
-    <div class="section">
-        <label for="settings-app-id">百度 App ID</label>
-        <input type="text" id="settings-app-id" placeholder="例如：12345678">
+    <!-- ====== 百度模块 ====== -->
+    <div id="baidu-config">
+        <div class="section">
+            <label for="settings-app-id">百度 App ID</label>
+            <input type="text" id="settings-app-id" placeholder="例如：12345678">
+        </div>
+
+        <div class="section">
+            <label for="settings-api-key">百度 API Key</label>
+            <input type="text" id="settings-api-key" placeholder="例如：UA4oPSxxxxkGOuFbb6">
+            <div class="hint">请到百度智能云控制台 → 语音技术 → 创建应用获取</div>
+        </div>
+
+        <div class="section">
+            <label for="settings-secret-key">百度 Secret Key</label>
+            <input type="text" id="settings-secret-key" placeholder="例如：tPqgBQbwVwxxxxx2fGkHdV2c">
+        </div>
     </div>
 
-    <div class="section">
-        <label for="settings-api-key">百度 API Key</label>
-        <input type="text" id="settings-api-key" placeholder="例如：UA4oPSxxxxkGOuFbb6">
-        <div class="hint">请到百度智能云控制台 → 语音技术 → 创建应用获取</div>
-    </div>
+    <!-- ====== 自定义模块 ====== -->
+    <div id="custom-config" style="display:none;">
+        <div class="section">
+            <label for="custom-endpoint">API 地址</label>
+            <input type="text" id="custom-endpoint" placeholder="https://api.xxx.com/v1/audio/transcriptions">
+            <div class="hint">程序会根据地址和模型名自动适配请求格式</div>
+        </div>
 
-    <div class="section">
-        <label for="settings-secret-key">百度 Secret Key</label>
-        <input type="text" id="settings-secret-key" placeholder="例如：tPqgBQbwVwxxxxx2fGkHdV2c">
+        <div class="section">
+            <label for="custom-api-key">API Key / Token</label>
+            <input type="password" id="custom-api-key" placeholder="sk-... 或 tp-...">
+        </div>
+
+        <div class="section">
+            <label for="custom-model">模型名称</label>
+            <input type="text" id="custom-model" placeholder="whisper-1">
+            <div class="hint">例如: whisper-1, mimo-v2.5-asr, gpt-4o-audio-preview 等</div>
+        </div>
+
+        <!-- 高级选项折叠 -->
+        <div id="advanced-toggle" style="margin-bottom:18px;">
+            <span id="advanced-link"
+                style="font-size:12px;color:rgba(100,180,255,0.6);cursor:pointer;user-select:none;">
+                ▶ 高级设置
+            </span>
+        </div>
+
+        <div id="advanced-fields" style="display:none;">
+            <div class="section">
+                <label for="custom-headers">额外请求头 (JSON)</label>
+                <textarea id="custom-headers" rows="2" placeholder='{"X-Custom-Header": "value"}'></textarea>
+                <div class="hint">会合并到默认请求头中</div>
+            </div>
+
+            <div class="section">
+                <label for="custom-body-template">请求体模板 (仅 HTTP API)</label>
+                <textarea id="custom-body-template" rows="2" placeholder='{"audio": "{{AUDIO_BASE64}}"}'></textarea>
+                <div class="hint"><code>{{AUDIO_BASE64}}</code> 自动替换为音频 Base64，<code>{{AUDIO_PATH}}</code> 为文件路径</div>
+            </div>
+
+            <div class="section">
+                <label for="custom-method">请求方法 (仅 HTTP API)</label>
+                <select id="custom-method">
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                </select>
+            </div>
+
+            <div class="section">
+                <label for="custom-ws-protocol">WebSocket 子协议 (可选)</label>
+                <input type="text" id="custom-ws-protocol" placeholder="例如：json">
+            </div>
+            <div class="section">
+                <label for="custom-api-key-file">鉴权方式</label>
+                <select id="custom-auth-type">
+                    <option value="bearer">Bearer Token (Authorization 头)</option>
+                    <option value="api-key">api-key 头 (小米 MiMo 等)</option>
+                </select>
+                <div class="hint">多数平台用 Bearer，小米 MiMo 用 api-key</div>
+            </div>
+        </div>
     </div>
 
     <div class="btn-row">
@@ -175,27 +270,96 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const providerSelect = document.getElementById('provider-select');
+            const baiduConfig = document.getElementById('baidu-config');
+            const customConfig = document.getElementById('custom-config');
+            const providerHint = document.getElementById('provider-hint');
+
+            // 百度字段
             const appIdInput = document.getElementById('settings-app-id');
             const apiKeyInput = document.getElementById('settings-api-key');
             const secretKeyInput = document.getElementById('settings-secret-key');
+
+            // 自定义字段
+            const customEndpoint = document.getElementById('custom-endpoint');
+            const customApiKey = document.getElementById('custom-api-key');
+            const customModel = document.getElementById('custom-model');
+            const customMethod = document.getElementById('custom-method');
+            const customHeaders = document.getElementById('custom-headers');
+            const customBodyTemplate = document.getElementById('custom-body-template');
+            const customWsProtocol = document.getElementById('custom-ws-protocol');
+            const customAuthType = document.getElementById('custom-auth-type');
+            const advLink = document.getElementById('advanced-link');
+            const advFields = document.getElementById('advanced-fields');
+            let advOpen = false;
+
             const saveBtn = document.getElementById('save-btn');
             const cancelBtn = document.getElementById('cancel-btn');
             const statusMsg = document.getElementById('status-msg');
 
-            // 加载当前配置
+            // ===== Provider 切换 =====
+            function toggleProvider(provider) {
+                const isBaidu = provider === 'baidu_stream' || provider === 'baidu_normal';
+                baiduConfig.style.display = isBaidu ? 'block' : 'none';
+                customConfig.style.display = isBaidu ? 'none' : 'block';
+
+                if (isBaidu) {
+                    providerHint.textContent = provider === 'baidu_stream'
+                        ? '推荐使用流式模式，识别速度更快'
+                        : '录完音后一次性发送到百度识别';
+                } else {
+                    providerHint.textContent = '填 API 地址 + API Key + 模型名，即可适配绝大多数平台';
+                }
+            }
+
+            // ===== 加载配置 =====
             window.settingsAPI.loadSettings().then((settings) => {
                 providerSelect.value = settings.PROVIDER || 'baidu_stream';
+                toggleProvider(providerSelect.value);
+
+                // 百度
                 appIdInput.value = settings.BAIDU_APP_ID || '';
                 apiKeyInput.value = settings.BAIDU_API_KEY || '';
                 secretKeyInput.value = settings.BAIDU_SECRET_KEY || '';
+
+                // 自定义
+                customEndpoint.value = settings.CUSTOM_ENDPOINT || '';
+                customApiKey.value = settings.CUSTOM_API_KEY || '';
+                customModel.value = settings.CUSTOM_MODEL || 'whisper-1';
+                customMethod.value = settings.CUSTOM_METHOD || 'POST';
+                customHeaders.value = settings.CUSTOM_HEADERS || '{}';
+                customBodyTemplate.value = settings.CUSTOM_BODY_TEMPLATE || '{"audio": "{{AUDIO_BASE64}}"}';
+                customWsProtocol.value = settings.CUSTOM_WS_PROTOCOL || '';
+                customAuthType.value = settings.CUSTOM_AUTH_TYPE || 'bearer';
             });
 
+            // ===== Provider 切换事件 =====
+            providerSelect.addEventListener('change', () => {
+                toggleProvider(providerSelect.value);
+            });
+
+            // ===== 高级设置折叠 =====
+            advLink.addEventListener('click', () => {
+                advOpen = !advOpen;
+                advFields.style.display = advOpen ? 'block' : 'none';
+                advLink.textContent = advOpen ? '▼ 收起高级设置' : '▶ 高级设置';
+            });
+
+            // ===== 保存 =====
             saveBtn.addEventListener('click', () => {
                 const settings = {
                     PROVIDER: providerSelect.value,
                     BAIDU_APP_ID: appIdInput.value.trim(),
                     BAIDU_API_KEY: apiKeyInput.value.trim(),
-                    BAIDU_SECRET_KEY: secretKeyInput.value.trim()
+                    BAIDU_SECRET_KEY: secretKeyInput.value.trim(),
+                    // 自定义模块
+                    CUSTOM_ENDPOINT: customEndpoint.value.trim(),
+                    CUSTOM_API_KEY: customApiKey.value.trim(),
+                    CUSTOM_MODEL: customModel.value.trim(),
+                    CUSTOM_METHOD: customMethod.value,
+                    CUSTOM_HEADERS: customHeaders.value.trim(),
+                    CUSTOM_BODY_TEMPLATE: customBodyTemplate.value.trim(),
+                    CUSTOM_WS_PROTOCOL: customWsProtocol.value.trim(),
+                    CUSTOM_AUTH_TYPE: customAuthType.value
                 };
 
                 window.settingsAPI.saveSettings(settings).then((result) => {

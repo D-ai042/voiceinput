@@ -8,6 +8,7 @@ let audioChunks = [];
 let isRecording = false;
 let timerId = null;
 let timerSeconds = 0;
+let streamTimerStarted = false; // 流式首帧标记，用于准确启动计时器
 
 // ========================
 // 计时器
@@ -83,18 +84,54 @@ function createWavFromBuffer(audioBuffer) {
 }
 
 // ========================
+// 直接 IPC 监听 — UI 动画（在 preload 层直接处理，保证响应速度）
+// ========================
+function getEl(id) { return document.getElementById(id); }
+
+ipcRenderer.on('start-recording-ui', () => {
+  const btn = getEl('voice-btn');
+  if (btn) { btn.classList.add('listening'); btn.classList.add('speaking'); }
+  // 注：计时器在 startStreamAudioRecording / startAudioRecording 中启动，
+  // 确保只有音频真正开始后才计时，不漏开头
+});
+
+ipcRenderer.on('stream-interim', (event, text) => {
+  const st = getEl('status-text');
+  if (st) {
+    st.textContent = text || '…';
+    st.className = 'recording';
+  }
+});
+
+ipcRenderer.on('stop-recording-ui', () => {
+  const btn = getEl('voice-btn');
+  const tt = getEl('timer-text');
+  if (btn) { btn.classList.remove('listening'); btn.classList.remove('speaking'); }
+  if (tt) tt.classList.remove('active');
+  stopTimer();
+});
+
+ipcRenderer.on('reset-ui', () => {
+  const btn = getEl('voice-btn');
+  const tt = getEl('timer-text');
+  const st = getEl('status-text');
+  if (btn) { btn.className = 'voice-btn'; }
+  if (tt) tt.classList.remove('active');
+  if (st) st.className = '';
+  stopTimer();
+});
+
+// ========================
 // contextBridge API
 // ========================
 contextBridge.exposeInMainWorld('electronAPI', {
   // ========== UI 更新 ==========
   updateIcon: (icon) => {
-    const btn = document.getElementById('mic-button');
+    const btn = document.getElementById('voice-btn');
     if (!btn) return;
-    btn.className = btn.className.replace(/\b(recording|processing|success|error)\b/g, '').trim();
-    if (icon === '🔴') btn.classList.add('recording');
-    else if (icon === '⏳') btn.classList.add('processing');
+    btn.classList.remove('listening', 'speaking', 'success');
+    if (icon === '🔴') { btn.classList.add('listening'); btn.classList.add('speaking'); }
     else if (icon === '✅') btn.classList.add('success');
-    else if (icon === '❌') btn.classList.add('error');
   },
 
   updateStatus: (text) => {
@@ -107,35 +144,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   startBreathing: () => {
-    const pr = document.getElementById('pulse-ring');
-    const wb = document.getElementById('wave-bars');
-    const tt = document.getElementById('timer-text');
-    if (pr) pr.classList.add('active');
-    if (wb) wb.classList.add('active');
-    if (tt) tt.classList.add('active');
+    const btn = getEl('voice-btn');
+    if (btn) { btn.classList.add('listening'); btn.classList.add('speaking'); }
+    getEl('timer-text')?.classList.add('active');
     startTimer();
   },
 
   stopBreathing: () => {
-    const pr = document.getElementById('pulse-ring');
-    const wb = document.getElementById('wave-bars');
-    const tt = document.getElementById('timer-text');
-    if (pr) pr.classList.remove('active');
-    if (wb) wb.classList.remove('active');
-    if (tt) tt.classList.remove('active');
+    const btn = getEl('voice-btn');
+    if (btn) { btn.classList.remove('listening'); btn.classList.remove('speaking'); }
+    getEl('timer-text')?.classList.remove('active');
     stopTimer();
   },
 
   resetUI: () => {
-    const btn = document.getElementById('mic-button');
-    if (btn) btn.className = '';
-    const pr = document.getElementById('pulse-ring');
-    const wb = document.getElementById('wave-bars');
-    const tt = document.getElementById('timer-text');
-    const st = document.getElementById('status-text');
-    if (pr) pr.classList.remove('active');
-    if (wb) wb.classList.remove('active');
-    if (tt) tt.classList.remove('active');
+    const btn = getEl('voice-btn');
+    if (btn) btn.className = 'voice-btn';
+    getEl('timer-text')?.classList.remove('active');
+    const st = getEl('status-text');
     if (st) st.className = '';
     stopTimer();
   },
@@ -143,9 +169,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ========== IPC 监听器 ==========
   onUpdateIcon: (cb) => { ipcRenderer.on('update-icon', (e, icon) => cb(icon)); },
   onUpdateStatus: (cb) => { ipcRenderer.on('update-status', (e, text) => cb(text)); },
-  onStartBreathing: (cb) => { ipcRenderer.on('start-recording-ui', () => cb()); },
-  onStopBreathing: (cb) => { ipcRenderer.on('stop-recording-ui', () => cb()); },
-  onResetUI: (cb) => { ipcRenderer.on('reset-ui', () => cb()); },
+  onResetUI: (cb) => { /* 已由直接 IPC 监听处理 */ },
   onStartRecording: (cb) => { ipcRenderer.on('start-recording', () => cb()); },
   onStopRecording: (cb) => { ipcRenderer.on('stop-recording', () => cb()); },
   onStartStreamRecording: (cb) => { ipcRenderer.on('start-stream-recording', () => cb()); },
@@ -159,6 +183,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // ========== 操作 ==========
   toggleRecording: () => ipcRenderer.send('toggle-recording'),
+  startPressRecording: () => ipcRenderer.send('start-recording-press'),
+  stopPressRecording: () => ipcRenderer.send('stop-recording-press'),
   sendRecordingStarted: (s) => ipcRenderer.send('recording-started', s),
   sendRecordingComplete: (p) => ipcRenderer.send('recording-complete', p),
   openSettings: () => ipcRenderer.send('open-settings'),
@@ -179,6 +205,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       };
       mediaRecorder.start(100);
       isRecording = true;
+
+      // 非流式：MediaRecorder 已开始 → 启动计时器
+      startTimer();
+      const tt = document.getElementById('timer-text');
+      if (tt) tt.classList.add('active');
+
       setTimeout(() => {
         if (isRecording) window.electronAPI.stopAudioRecording();
       }, 60000);
@@ -217,7 +249,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ========== 流式录音（PCM 实时发送） ==========
+
   startStreamAudioRecording: async () => {
+    // 可重入：已经录制中的不重复启动
+    if (isRecording && mediaRecorder && mediaRecorder.stream) return true;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true }
@@ -229,8 +265,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       const source = audioCtx.createMediaStreamSource(stream);
       const processor = audioCtx.createScriptProcessor(1024, 1, 1);
 
+      // 重置首次回调标记
+      streamTimerStarted = false;
+
       processor.onaudioprocess = (ev) => {
         if (!isRecording) return;
+        // 第一次收到音频数据时启动计时器（不漏开头，也不虚假计时）
+        if (!streamTimerStarted) {
+          streamTimerStarted = true;
+          startTimer();
+          const tt = document.getElementById('timer-text');
+          if (tt) tt.classList.add('active');
+        }
         const input = ev.inputBuffer.getChannelData(0);
         const pcm = new Int16Array(input.length);
         for (let i = 0; i < input.length; i++) {

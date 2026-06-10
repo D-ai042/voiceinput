@@ -11,310 +11,480 @@
       box-sizing: border-box;
     }
 
+    html {
+      width: 60px;
+      height: 80px;
+      border-radius: 16px;
+      overflow: hidden;
+      -webkit-mask-image: -webkit-radial-gradient(circle, white, black);
+      mask-image: radial-gradient(circle, white, black);
+    }
+
     body {
-      background: rgba(30, 30, 30, 0.92);
-      width: 120px;
-      height: 200px;
+      width: 60px;
+      height: 80px;
+      background: rgba(6, 8, 20, 0.78);
+      border-radius: 16px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 8px 4px;
+      padding: 2px 0;
       -webkit-app-region: drag;
       font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
       overflow: hidden;
-    }
-
-    /* ====== 顶部工具栏 ====== */
-    .toolbar {
-      display: flex;
-      gap: 4px;
-      margin-bottom: 4px;
-      width: 100%;
-      justify-content: center;
-      -webkit-app-region: no-drag;
-    }
-
-    .toolbar button {
-      padding: 2px 6px;
-      font-size: 10px;
-      background: rgba(60, 60, 60, 1);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 4px;
-      color: #ccc;
-      cursor: pointer;
-      -webkit-app-region: no-drag;
-      transition: background 0.15s, color 0.15s;
-      line-height: 1.4;
-    }
-
-    .toolbar button:hover {
-      background: rgba(80, 80, 80, 1);
-      color: #fff;
-    }
-
-    .toolbar button:active {
-      background: rgba(100, 100, 100, 1);
-    }
-
-    /* ====== 麦克风按钮 ====== */
-    .mic-area {
-      position: relative;
-      width: 60px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 4px 0;
-    }
-
-    #mic-button {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      border: 2px solid rgba(255, 255, 255, 0.2);
-      background: rgba(70, 70, 70, 1);
-      color: #fff;
-      font-size: 24px;
-      cursor: pointer;
-      -webkit-app-region: no-drag;
-      transition: all 0.25s;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       user-select: none;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
-    #mic-button:hover {
-      background: rgba(90, 90, 90, 1);
-      border-color: rgba(255, 255, 255, 0.35);
+    /* ====== 顶栏 ====== */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      padding: 0 5px;
+      height: 12px;
+      flex-shrink: 0;
+      z-index: 2;
     }
 
-    #mic-button:active {
-      transform: scale(0.93);
+    .top-bar button {
+      width: 12px;
+      height: 12px;
+      border: none;
+      background: none;
+      color: rgba(255, 255, 255, 0.2);
+      font-size: 8px;
+      cursor: pointer;
+      padding: 0;
+      line-height: 12px;
+      text-align: center;
+      border-radius: 3px;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
     }
 
-    /* 录音状态 */
-    #mic-button.recording {
-      background: #d32f2f;
-      border-color: #ff5252;
-      box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
-      animation: mic-pulse 1s ease-in-out infinite;
+    #btn-settings:hover {
+      color: rgba(100, 190, 255, 0.85);
+      background: rgba(100, 190, 255, 0.08);
     }
 
-    #mic-button.processing {
-      background: #f57c00;
-      border-color: #ffab40;
+    #btn-quit:hover {
+      color: rgba(255, 90, 90, 0.85);
+      background: rgba(255, 90, 90, 0.08);
     }
 
-    #mic-button.success {
-      background: #388e3c;
-      border-color: #69f0ae;
-    }
-
-    #mic-button.error {
-      background: #b71c1c;
-      border-color: #ff1744;
-    }
-
-    @keyframes mic-pulse {
-
-      0%,
-      100% {
-        transform: scale(1);
-        box-shadow: 0 0 16px rgba(211, 47, 47, 0.6);
-      }
-
-      50% {
-        transform: scale(1.06);
-        box-shadow: 0 0 28px rgba(211, 47, 47, 0.9);
-      }
-    }
-
-    /* ====== 脉冲环 ====== */
-    #pulse-ring {
-      position: absolute;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      border: 2px solid rgba(255, 82, 82, 0.4);
-      top: 0;
-      left: 0;
+    /* ====== 计时器 ====== */
+    #timer-text {
+      height: 8px;
+      font-size: 6px;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255, 255, 255, 0.12);
+      letter-spacing: 0.5px;
+      line-height: 8px;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.3s;
       pointer-events: none;
+      z-index: 2;
+    }
+
+    #timer-text.active {
+      opacity: 1;
+      color: rgba(255, 150, 150, 0.5);
+    }
+
+    /* ====== 中心按钮区 ====== */
+    .center-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      width: 100%;
+      min-height: 0;
+      z-index: 2;
+    }
+
+    /* 主按钮 — 玻璃质感麦克风 */
+    .voice-btn {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: 0.25s ease;
+      border: none;
+      outline: none;
+      padding: 0;
+      background: transparent;
+    }
+
+    /* 玻璃层 */
+    .glass {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04));
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.3),
+        inset 0 -12px 24px rgba(255, 255, 255, 0.03),
+        0 8px 30px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
+
+    /* 麦克风 SVG */
+    .mic-icon {
+      width: 13px;
+      height: 13px;
+      color: rgba(255, 255, 255, 0.85);
+      z-index: 2;
+      position: relative;
+    }
+
+    /* 呼吸光（::before） */
+    .voice-btn::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(120, 180, 255, 0.6), transparent 70%);
+      opacity: 0;
+      transition: 0.3s;
+      pointer-events: none;
+    }
+
+    /* 监听状态 */
+    .voice-btn.listening {
+      transform: scale(1.06);
+    }
+
+    .voice-btn.listening::before {
+      opacity: 1;
+      animation: breathe 2s infinite;
+    }
+
+    /* 声波涟漪 — 不超出圆角矩形边框 */
+    .waves {
+      position: absolute;
+      inset: -14px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .waves span {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(120, 180, 255, 0.45);
       opacity: 0;
     }
 
-    #pulse-ring.active {
-      opacity: 1;
-      animation: pulse-ring 1.5s ease-out infinite;
+    .voice-btn.speaking .waves span:nth-child(1) {
+      width: 40px;
+      height: 40px;
+      animation: wave 1.2s infinite;
     }
 
-    @keyframes pulse-ring {
+    .voice-btn.speaking .waves span:nth-child(2) {
+      width: 48px;
+      height: 48px;
+      animation: wave 1.2s infinite 0.3s;
+    }
+
+    .voice-btn.speaking .waves span:nth-child(3) {
+      width: 56px;
+      height: 56px;
+      animation: wave 1.2s infinite 0.6s;
+    }
+
+    /* 成功状态 */
+    .voice-btn.success {
+      background: radial-gradient(circle, rgba(92, 255, 182, 0.25), transparent);
+    }
+
+    .voice-btn.success .mic-icon {
+      display: none;
+    }
+
+    .voice-btn.success::after {
+      content: "✓";
+      position: absolute;
+      color: #69ffb4;
+      font-size: 15px;
+      font-weight: 600;
+      z-index: 2;
+    }
+
+    /* 动画 */
+    @keyframes breathe {
       0% {
-        transform: scale(0.9);
+        transform: scale(1);
+        opacity: 0.3;
+      }
+
+      50% {
+        transform: scale(1.15);
         opacity: 0.8;
       }
 
       100% {
+        transform: scale(1);
+        opacity: 0.3;
+      }
+    }
+
+    @keyframes wave {
+      from {
+        transform: scale(0.8);
+        opacity: 0.8;
+      }
+
+      to {
         transform: scale(1.4);
         opacity: 0;
       }
     }
 
-    /* ====== 声波动画 ====== */
-    #wave-bars {
-      display: flex;
-      gap: 3px;
-      align-items: center;
-      height: 18px;
-      margin-top: 2px;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    #wave-bars.active {
-      opacity: 1;
-    }
-
-    #wave-bars span {
-      display: block;
-      width: 3px;
-      background: #ff5252;
-      border-radius: 2px;
-      animation: wave 0.5s ease-in-out infinite alternate;
-    }
-
-    #wave-bars span:nth-child(1) {
-      height: 6px;
-      animation-delay: 0s;
-    }
-
-    #wave-bars span:nth-child(2) {
-      height: 10px;
-      animation-delay: 0.15s;
-    }
-
-    #wave-bars span:nth-child(3) {
-      height: 14px;
-      animation-delay: 0.3s;
-    }
-
-    #wave-bars span:nth-child(4) {
-      height: 10px;
-      animation-delay: 0.15s;
-    }
-
-    #wave-bars span:nth-child(5) {
-      height: 6px;
-      animation-delay: 0s;
-    }
-
-    @keyframes wave {
-      0% {
-        transform: scaleY(0.3);
-      }
-
-      100% {
-        transform: scaleY(1);
-      }
-    }
-
     /* ====== 状态文字 ====== */
     #status-text {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 10px;
-      line-height: 1.3;
-      margin-top: 2px;
-      -webkit-app-region: no-drag;
+      height: 8px;
+      font-size: 6px;
+      color: rgba(255, 255, 255, 0.14);
+      line-height: 8px;
       text-align: center;
+      flex-shrink: 0;
+      letter-spacing: 0.3px;
+      transition: color 0.3s;
+      z-index: 2;
     }
 
     #status-text.recording {
-      color: #ff5252;
+      color: rgba(255, 150, 150, 0.5);
     }
 
     #status-text.processing {
-      color: #ffab40;
+      color: rgba(255, 210, 90, 0.5);
     }
 
-    /* ====== 计时器 ====== */
-    #timer-text {
-      color: rgba(255, 255, 255, 0.3);
-      font-size: 9px;
-      font-family: monospace;
-      line-height: 1.2;
-      opacity: 0;
-      transition: opacity 0.3s;
+    /* ====== 底部流式开关 ====== */
+    .bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 12px;
+      flex-shrink: 0;
+      z-index: 2;
     }
 
-    #timer-text.active {
-      opacity: 1;
+    #stream-toggle {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      padding: 1px 4px;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    #stream-toggle:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    #stream-toggle label {
+      font-size: 6px;
+      color: rgba(255, 255, 255, 0.2);
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: color 0.2s;
+    }
+
+    #stream-toggle label.active {
+      color: rgba(80, 190, 255, 0.5);
+    }
+
+    .toggle-track {
+      width: 14px;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      position: relative;
+      transition: background 0.25s;
+      flex-shrink: 0;
+    }
+
+    .toggle-track.active {
+      background: rgba(80, 190, 255, 0.25);
+    }
+
+    .toggle-knob {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      position: absolute;
+      top: 1px;
+      left: 1px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .toggle-track.active .toggle-knob {
+      left: 9px;
+      background: rgba(80, 190, 255, 0.75);
     }
   </style>
 </head>
 
 <body>
-  <div class="toolbar">
-    <button id="btn-settings">⚙</button>
-    <button id="btn-mode">流式</button>
-    <button id="btn-quit">✖</button>
+  <!-- 顶栏 -->
+  <div class="top-bar">
+    <button id="btn-settings" title="设置">⚙</button>
+    <button id="btn-quit" title="退出">✕</button>
   </div>
 
-  <div class="mic-area">
-    <div id="pulse-ring"></div>
-    <button id="mic-button">🎤</button>
-  </div>
-
-  <div id="wave-bars">
-    <span></span><span></span><span></span><span></span><span></span>
-  </div>
-
-  <div id="status-text">等待</div>
+  <!-- 计时器 -->
   <div id="timer-text">00:00</div>
+
+  <!-- 中心按钮 -->
+  <div class="center-area">
+    <button class="voice-btn" id="voice-btn">
+      <div class="glass"></div>
+      <svg class="mic-icon" viewBox="0 0 24 24">
+        <path
+          d="M12 15a3 3 0 0 0 3-3V7a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V22h3a1 1 0 1 1 0 2H8a1 1 0 0 1 0-2h3v-3.07A7 7 0 0 1 5 12a1 1 0 0 1 2 0 5 5 0 0 0 10 0z"
+          fill="currentColor" />
+      </svg>
+      <div class="waves">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </button>
+  </div>
+
+  <!-- 状态文字 -->
+  <div id="status-text">就绪</div>
+
+  <!-- 底部流式开关 -->
+  <div class="bottom-bar">
+    <div id="stream-toggle">
+      <label id="stream-label">流式</label>
+      <div class="toggle-track active" id="toggle-track">
+        <div class="toggle-knob" id="toggle-knob"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const api = window.electronAPI;
-      const statusEl = document.getElementById('status-text');
-      const modeBtn = document.getElementById('btn-mode');
+      if (!api) return;
 
-      if (!api) {
-        statusEl.textContent = '❌ API 未加载';
-        return;
-      }
+      const btn = document.getElementById('voice-btn');
+      const statusText = document.getElementById('status-text');
 
-      statusEl.textContent = '✅ 就绪';
+      // ===== 单击切换 + 长按录音 =====
+      let pressTimer = null;
+      let isLongPress = false;
 
-      // ========== 按钮点击 ==========
+      btn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        isLongPress = false;
+        btn.classList.remove('success');
+        btn.classList.add('listening', 'speaking');
+        // 立即启动音频采集，防止漏开头
+        if (isStreamMode) {
+          api.startStreamAudioRecording();
+        }
+        // 长按检测：300ms 后视为长按，开始识别
+        pressTimer = setTimeout(() => {
+          isLongPress = true;
+          api.startPressRecording();
+        }, 300);
+      });
+
+      btn.addEventListener('mouseup', () => {
+        clearTimeout(pressTimer);
+        btn.classList.remove('listening', 'speaking');
+        if (isLongPress) {
+          // 长按松开 → 停止录音
+          api.stopPressRecording();
+        } else {
+          // 短按（单击）→ 切换录音开关
+          api.toggleRecording();
+        }
+      });
+
+      // ===== IPC 监听 UI 状态同步 =====
+      api.onUpdateIcon((icon) => {
+        if (icon === '🔴') {
+          btn.classList.add('listening', 'speaking');
+        } else if (icon === '✅') {
+          btn.classList.remove('listening', 'speaking');
+          btn.classList.add('success');
+          setTimeout(() => btn.classList.remove('success'), 800);
+        } else {
+          btn.classList.remove('listening', 'speaking', 'success');
+        }
+      });
+
+      // ===== 顶栏按钮 =====
       document.getElementById('btn-settings').onclick = () => api.openSettings();
       document.getElementById('btn-quit').onclick = () => api.quitApp();
 
-      document.getElementById('mic-button').onclick = () => {
-        api.toggleRecording();
-      };
-
+      // ===== 流式开关 / 模式指示 =====
+      const toggleTrack = document.getElementById('toggle-track');
+      const toggleLabel = document.getElementById('stream-label');
       let isStreamMode = true;
-      modeBtn.onclick = () => {
+      let currentProviderName = 'baidu_stream';
+
+      api.getMode().then((mode) => {
+        currentProviderName = mode;
+        isStreamMode = mode === 'baidu_stream';
+        updateToggleUI();
+      });
+
+      function updateToggleUI() {
+        if (currentProviderName === 'custom') {
+          // 自定义模块 → 显示为"自定义"
+          toggleLabel.textContent = '🌟';
+          toggleTrack.classList.add('active');
+          toggleLabel.classList.add('active');
+          document.getElementById('stream-toggle').style.cursor = 'default';
+        } else {
+          toggleLabel.textContent = '流式';
+          toggleTrack.classList.toggle('active', isStreamMode);
+          toggleLabel.classList.toggle('active', isStreamMode);
+          document.getElementById('stream-toggle').style.cursor = 'pointer';
+        }
+      }
+
+      document.getElementById('stream-toggle').onclick = () => {
+        if (currentProviderName === 'custom') return; // 自定义模式不可切换
         isStreamMode = !isStreamMode;
-        const mode = isStreamMode ? 'baidu_stream' : 'baidu_normal';
-        api.setMode(mode);
-        modeBtn.textContent = isStreamMode ? '流式' : '标准';
-        statusEl.textContent = '已切换' + (isStreamMode ? '流式' : '标准');
-        setTimeout(() => { statusEl.textContent = '✅ 就绪'; }, 1000);
+        api.setMode(isStreamMode ? 'baidu_stream' : 'baidu_normal');
+        updateToggleUI();
       };
 
-      // ========== 注册 IPC 监听器 ==========
-      // 这些是核心：把主进程发来的消息连接到 preload 的 UI 更新函数
-      api.onUpdateIcon((icon) => api.updateIcon(icon));
-      api.onUpdateStatus((text) => api.updateStatus(text));
-      api.onStartBreathing(() => api.startBreathing());
-      api.onStopBreathing(() => api.stopBreathing());
-      api.onResetUI(() => api.resetUI());
-      api.onNotify((msg) => statusEl.textContent = msg);
+      api.onUpdateStatus((text) => {
+        if (!statusText) return;
+        statusText.textContent = text;
+        statusText.className = '';
+        if (text.includes('录音') || text.includes('流式')) statusText.classList.add('recording');
+        else if (text.includes('识别')) statusText.classList.add('processing');
+      });
 
-      // 非流式录音（标准模式）：开始/停止 → preload 负责采集 → 返回音频路径
       api.onStartRecording(async () => {
         const ok = await api.startAudioRecording();
         api.sendRecordingStarted(ok);
@@ -324,15 +494,8 @@
         if (path) api.sendRecordingComplete(path);
       });
 
-      // 流式录音：开始/停止 PCM 采集
       api.onStartStreamRecording(() => api.startStreamAudioRecording());
       api.onStopStreamRecording(() => api.stopStreamAudioRecording());
-
-      // 显示流式识别中间结果
-      api.onStreamResult((text) => {
-        const short = text.length > 18 ? text.substring(0, 18) + '…' : text;
-        statusEl.textContent = '🎤 ' + short;
-      });
     });
   </script>
 </body>
