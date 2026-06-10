@@ -124,56 +124,72 @@ npm run build
 
 ---
 
-## 5. 发布流程（推送到 GitHub）
+## 5. 发布流程（标准操作）
 
-### 完整发布步骤
+### 一句话流程
 
 ```bash
-# 第一步：查看当前更改
-git status
+git add . && git commit -m "描述更改"
+git tag v1.0.1
+git push origin master --tags
+```
 
-# 第二步：添加所有更改
+> 推送后 GitHub Actions **自动构建** Windows + macOS 版本，**自动发布** Release。
+
+### 完整步骤
+
+```bash
+# 1. 提交代码
 git add .
-git commit -m "描述本次更改"
+git commit -m "feat: xxx功能"
 
-# 第三步：打标签（可选，用于版本发布）
-git tag v1.0.0
+# 2. 打版本标签（触发 CI 自动构建）
+git tag v1.0.1
 
-# 第四步：推送到 GitHub
-# 由于网络限制，使用 ghfast.top 代理推送
-# 方式 A：直接带 Token（一次性）
-git remote set-url origin https://<USERNAME>:<TOKEN>@ghfast.top/https://github.com/D-ai042/vioceinput.git
+# 3. 推送到 GitHub（自动触发 Actions 构建 Win + Mac）
+# 使用代理推送
+git remote set-url origin https://<USERNAME>:<TOKEN>@ghfast.top/https://github.com/D-ai042/voiceinput.git
 git push origin master --tags
 
-# 推送完成后，恢复普通地址
-git remote set-url origin https://ghfast.top/https://github.com/D-ai042/vioceinput.git
+# 4. 推送完成后，切回代理地址
+git remote set-url origin https://ghfast.top/https://github.com/D-ai042/voiceinput.git
 ```
 
-### 关于 Token
+### 自动构建流程
 
-推送到 GitHub 需要 **Personal Access Token (classic)**：
-
-1. 访问 https://github.com/settings/tokens
-2. 点击 **Generate new token (classic)**
-3. 名称：`voiceinput-push`
-4. 过期：推荐 30 天或 No expiration
-5. 权限：勾选 **repo**（全部）
-6. 生成后复制 Token
-
-### 首次推送（新仓库）
-
-如果 GitHub 上还没有 `vioceinput` 仓库：
-
-```bash
-# 方式一：用 gh CLI 创建
-gh repo create vioceinput --public --source=. --remote=origin --push
-
-# 方式二：手动创建 + 推送
-# 1. 在 GitHub 上新建空仓库（不勾选 README/LICENSE/.gitignore）
-# 2. 本地执行：
-git remote add origin https://<TOKEN>@ghfast.top/https://github.com/D-ai042/vioceinput.git
-git push -u origin master
 ```
+git push --tags
+      ↓
+GitHub Actions 触发
+      ↓
+ ┌──────────────┐   ┌──────────────┐
+ │ windows-latest│   │ macos-latest │
+ │ 构建 EXE      │   │ 构建 DMG+ZIP │
+ └──────┬───────┘   └──────┬───────┘
+        ↓                  ↓
+ ┌──────────────┐   ┌──────────────┐
+ │ VoiceInput   │   │ VoiceInput   │
+ │ .exe         │   │ .dmg / .zip  │
+ └──────────────┘   └──────────────┘
+        ↓                  ↓
+ ┌──────────────────────────────┐
+ │   自动创建 GitHub Release    │
+ │   附带 Win + Mac 安装包      │
+ └──────────────────────────────┘
+```
+
+### 发布产物
+
+构建完成后自动出现在 Release 页面：
+
+```
+https://github.com/D-ai042/voiceinput/releases/tag/v1.0.1
+```
+
+| 平台 | 文件 |
+|------|------|
+| Windows | `VoiceInput.exe` |
+| macOS | `VoiceInput-1.0.1-mac.dmg` + `.zip` |
 
 ---
 

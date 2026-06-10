@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -71,3 +74,5 @@ jobs:
         with:
           files: release-assets/**
           generate_release_notes: true
+          name: VoiceInput ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
