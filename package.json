@@ -14,7 +14,10 @@
       "icon": "src/assets/icon256.png"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "src/assets/icon256.png",
       "artifactName": "VoiceInput-${version}-mac.${ext}",
       "category": "public.app-category.productivity"

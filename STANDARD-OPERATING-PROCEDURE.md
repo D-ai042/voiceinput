@@ -181,32 +181,32 @@ git push -u origin master
 
 ### 触发条件
 
-打 `v*` 标签推送到 GitHub 后，可配置 GitHub Actions 自动构建。
+打 `v*` 标签推送到 GitHub 后，自动触发 `.github/workflows/build.yml`。
 
-### 示例 workflow（`.github/workflows/build.yml`）
+### 构建矩阵
 
-```yaml
-name: Build
+| 操作系统 | 运行环境 | 产物格式 |
+|---------|---------|---------|
+| Windows | GitHub Actions (windows-latest) | 绿色单文件 `VoiceInput.exe` |
+| macOS | GitHub Actions (macos-latest) | DMG 安装包 + ZIP 压缩包 |
 
-on:
-  push:
-    tags:
-      - 'v*'
+### 构建流程
 
-jobs:
-  build:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: VoiceInput.exe
-          path: dist/VoiceInput.exe
+1. 推送 `v*` 标签 → 自动触发 Workflow
+2. Windows 和 macOS 并行构建
+3. 构建完成后自动创建 GitHub Release
+4. Release 页面可直接下载对应平台的安装包
+
+### 手动触发
+
+在 GitHub 仓库的 **Actions** 标签页中，选择 **Build** Workflow，点击 **Run workflow** 即可手动触发。
+
+### 产物发布
+
+构建完成后自动上传到对应版本的 GitHub Release 页面：
+
+```
+https://github.com/D-ai042/voiceinput/releases/tag/v1.0.0
 ```
 
 ---
