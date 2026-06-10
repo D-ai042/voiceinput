@@ -100,19 +100,25 @@ npm start
 
 ---
 
-## 4. 构建 EXE 安装包
+## 4. 构建安装包
 
 ### 构建命令
 
 ```bash
+# Windows（绿色单文件）
+npm run build
+
+# macOS（需在 macOS 上执行）
 npm run build
 ```
 
 ### 产物位置
 
-| 格式 | 路径 |
-|------|------|
-| 绿色单文件 | `dist/VoiceInput.exe` |
+| 平台 | 格式 | 路径 |
+|------|------|------|
+| Windows | 绿色单文件 EXE | `dist/VoiceInput.exe` |
+| macOS | DMG 安装包 | `dist/VoiceInput-<version>-mac.dmg` |
+| macOS | ZIP 压缩包 | `dist/VoiceInput-<version>-mac.zip` |
 
 双击 `VoiceInput.exe` 即可运行，无需安装。
 

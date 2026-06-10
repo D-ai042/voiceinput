@@ -11,7 +11,13 @@
   "build": {
     "win": {
       "target": "portable",
-      "icon": "src/assets/app3.ico"
+      "icon": "src/assets/icon256.png"
+    },
+    "mac": {
+      "target": ["dmg", "zip"],
+      "icon": "src/assets/icon256.png",
+      "artifactName": "VoiceInput-${version}-mac.${ext}",
+      "category": "public.app-category.productivity"
     },
     "portable": {
       "artifactName": "VoiceInput.exe"
